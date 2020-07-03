@@ -2,10 +2,13 @@
 ---------------------------------------------------------
 
 Here comes the implementation of our paper on transfer learning with kernel ridge regression, and it doesn't require finetuning the base model. 
+
 In our experiments, we primarily tested on transferring from ResNet models pretrained on the ImageNet dataset to six downstream tasks, including CIFAR10, CIFAR100, STL10, CUB200, SVHN and Kuzushiji49.
+
 The details of our method in four steps are presented in the [paper](https://arxiv.org/pdf/2006.06791.pdf):
 
 *Transfer Learning with Kernel Ridge Regression*
+
 by Shuai Tang and Virginia R. de Sa
 
 ## Brief Introduction
@@ -14,6 +17,7 @@ The Implementation relies on the following files:
 *TLKRR.py* is the main file that conducts our four-step transfer learning method with kernel ridge regression.
 
 *sketched_kernels.py* sketches the feature vectors at individual layers into a fixed number of buckets.
+
 *lowrank_feats.py* applies the Nyström method on top of feature vectors to compute low-rank approximations.
 
 *learning_kernel_alignment.py* computes the optimal convex combination of feature vectors from individual layers that gives the highest alignment score with the target in a downstream task.
