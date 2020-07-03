@@ -10,9 +10,6 @@ import numpy as np
 
 from PIL import Image
 
-# def default_loader(path):
-#     return Image.open(path).convert('RGB')
-
 class KUZUSHIJI49(VisionDataset):
     resources = ['http://codh.rois.ac.jp/kmnist/dataset/k49/k49-train-imgs.npz',
                  'http://codh.rois.ac.jp/kmnist/dataset/k49/k49-train-labels.npz',
@@ -36,9 +33,6 @@ class KUZUSHIJI49(VisionDataset):
             data_file  = np.load(os.path.join(self.root, self.__class__.__name__, 'k49-test-imgs.npz'))['arr_0']
             label_file = np.load(os.path.join(self.root, self.__class__.__name__, 'k49-test-labels.npz'))['arr_0']
 
-        # data_file = np.expand_dims(data_file, 1)
-        # data_file = np.tile(data_file, [1,3,1,1])
-
         self.data, self.targets = data_file, torch.from_numpy(label_file).long()
 
     def download(self):
@@ -55,12 +49,10 @@ class KUZUSHIJI49(VisionDataset):
     def __getitem__(self, index):
 
         img, target = self.data[index], self.targets[index]
-        # print()
         img = Image.fromarray(img, mode='L').convert('RGB')
 
         if self.transform is not None:
             img = self.transform(img)
-        # print(img.size())
         if self.target_transform is not None:
             target = self.target_transform(target)
 
