@@ -62,20 +62,27 @@ if __name__ == "__main__":
         "train": load_dataset(args.task, "train", args.bsize, args.datapath, imgsize),
         "test":  load_dataset(args.task, "test",  args.bsize, args.datapath, imgsize)
     }
+
+    # Oh well, I guess we wanted to study pretrained ones then
     net = load_model(device, args.modelname, pretrained=True)
 
+
     # # # # # # # # # # # # # # # #
-    # Nystroem with CountSketch for low-rank approximation
+    # Nyström with CountSketch for low-rank approximation
     # # # # # # # # # # # # # # # #
 
     # Set the model to be in the evaluation mode. VERY IMPORTANT!
     net.eval()
+
+    # Compute subsampled data samples and projection matrices only on the TRAINING set
     csm = SketchedKernels(net, loader["train"], imgsize, device, args.M, args.T, args.freq_print)
     csm.compute_sketched_kernels()
 
     lowrank_feats = {}
     targets = {}
 
+    # Project feature vectors of individual layers to low-dimensional spaces 
+    # on both the training and test set
     for split in ["train", "test"]:
         proj = LowrankFeats(net, loader[split], csm.projection_matrices, csm.sketched_matrices, imgsize, device, args.freq_print)
         proj.compute_lowrank_feats()
@@ -85,11 +92,15 @@ if __name__ == "__main__":
 
     del csm, net, loader
 
+    # Zero-centre and normalise low-rank feature vectors
     for layer_id in lowrank_feats["train"]:
         mean_vec = lowrank_feats["train"][layer_id].mean(axis=0, keepdims=True)
+        
+        # Data centring
         lowrank_feats["train"][layer_id] -= mean_vec
         lowrank_feats["test"][layer_id]  -= mean_vec
-        # TODO: normalisation
+        
+        # Normalisation
         factor = np.linalg.norm(lowrank_feats["train"][layer_id].T @ lowrank_feats["train"][layer_id])
         lowrank_feats["train"][layer_id] /= factor
         lowrank_feats["test"][layer_id] /= factor
@@ -111,6 +122,7 @@ if __name__ == "__main__":
     train_features = []
     test_features  = []
 
+    # Accumulate layers with non-zero \mu
     for index in sorted_indices:
         if mu[index] != 0:
             train_features.append((mu[index] ** 0.5) * lowrank_feats["train"][index])
@@ -119,8 +131,9 @@ if __name__ == "__main__":
     train_features = np.concatenate(train_features, axis=1)
     test_features  = np.concatenate(test_features,  axis=1)
 
+
     # # # # # # # # # # # # # # # #
-    # Nystroem again!
+    # Nyström again!
     # # # # # # # # # # # # # # # #
 
     factor = np.max(np.linalg.norm(train_features, axis=1))
@@ -128,12 +141,14 @@ if __name__ == "__main__":
     test_features /= factor
     dim = min(args.M * 2, train_features.shape[0])
     print("Nystroem dim is {}".format(dim))
-    # gamma = 1./np.max(np.linalg.norm(train_features, axis=1))
+
+    # Use the Nyström approximation in sklearn
     gamma = 1.
     approx = Nystroem(kernel='rbf', gamma=gamma, n_components=dim)
     approx.fit(train_features)
     train_features = approx.transform(train_features)
     test_features  = approx.transform(test_features)
+
 
     # # # # # # # # # # # # # # # #
     # Ridge regression with cross validation

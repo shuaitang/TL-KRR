@@ -10,12 +10,44 @@ from abc import ABC
 class LowrankFeats(ABC):
 
     r"""
+    For each layer, given a subsampled dataset and a projection matrix, 
+    the module computes a low-rank approximation of feature vectors from that layer.
     """
 
     def __init__(self, model, loader, projection_matrices, sketched_matrices, imgsize, device, freq_print):
 
         r"""
         Initialise variables
+
+        Parameters
+        ---------
+        model    : PyTorch model instance
+            A ResNet model 
+            (We only tested on ResNet18 and ResNet34 pretrained on the ImageNet dataset, 
+            but it should work for all pretrained ResNet models)
+
+        loader : PyTorch DataLoader instance
+            A data loader for the dataset of a downstream task
+
+        projection_matrices : (n_layers) list
+            A list of projection matrices obtained through the Nyström method for dimensionality reduction.
+            The number of elements is equal to the number of layers one wants to accumulate.
+
+        sketched_matrices : (n_layers) list
+            A list of data summaries obtained through CWT (Clarkson-Woodruff Transformation), 
+            of which each serves as subsampled data points for Nyström.
+        
+        imgsize : int
+            The size of the input images
+
+        device : str
+            GPU or CPU. GPU is recommended for forwarding samples through a neural network as it is faster.
+            (We actually kinda ignore this argument in this class. :shrug:)
+
+        freq_print : int
+            The printing frequency.
+            
+
         """
         self.model = model
         self.loader = loader
@@ -31,6 +63,24 @@ class LowrankFeats(ABC):
 
 
     def project_feats(self, feats, layer_id):
+
+        r"""
+        Project a batch of feature vectors into the low-dimensional space 
+        obtained through the Nyström method.
+
+        Parameters
+        ---------
+        feats    : (batchsize, n_channels, height, width) PyTorch Tensor
+            A batch of feature vectors 
+        layer_id : int
+            The index of the layer from which the feature vectors are produced
+        
+        Returns
+        --------
+        None
+
+        """
+
 
         batchsize  = feats.size(0)
         feats = feats.data.view(batchsize, -1).type(torch.cuda.FloatTensor)
@@ -55,7 +105,19 @@ class LowrankFeats(ABC):
     def forward_with_layerwise_hooks(self, input_features):
 
         r"""
+        Forward function to collect feature vectors at multiple layers
+
+        Parameters
+        ---------
+        input_features : (batchsize, 3, height, width) PyTorch Tensor
+            A batch of input images
+        
+        Returns
+        --------
+        None
+
         """
+
         batchsize = input_features.size(0)
 
         layer_id = 0
@@ -84,6 +146,16 @@ class LowrankFeats(ABC):
     def compute_projections(self):
 
         r"""
+        Compute low-rank approximations of features at multiple layers for all data samples
+
+        Parameters
+        ---------
+        None
+        
+        Returns
+        --------
+        None
+
         """
 
         self.model.eval()
@@ -106,6 +178,16 @@ class LowrankFeats(ABC):
     def compute_lowrank_feats(self):
 
         r"""
+        Main function to call to compute low-rank approximations
+
+        Parameters
+        ---------
+        None
+
+        Returns
+        --------
+        None
+
         """
 
         self.compute_projections()

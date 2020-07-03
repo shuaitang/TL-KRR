@@ -10,7 +10,7 @@ class LearningKernelAlignment(ABC):
         Python implementation of the 'alignf' to find 
         the optimal convex combination of linear kernels.
         
-        Ref:
+        Reference:
         Cortes, C., Mohri, M., & Rostamizadeh, A. (2012). 
         Algorithms for Learning Kernels Based on Centered Alignment. 
         Journal of Machine Learning Research, 13, 795-828.

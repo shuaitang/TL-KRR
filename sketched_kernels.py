@@ -21,6 +21,17 @@ def hashing(SA, row_maps, sign, data, T):
 class SketchedKernels(ABC):
 
     r"""
+    For each layer, Clarkson-Woodruff Transformation (CWT) is applied to hash feature vectors to a small number of buckets,
+    which are used as the subsampled data samples in the Nyström method. 
+
+    Reference: 
+    Clarkson, K.L., & Woodruff, D.P. (2013). 
+    Low rank approximation and regression in input sparsity time. 
+    The Annual ACM Symposium on Theory of Computing (STOC) 2013.
+
+    Jagadeesan, M. (2019). 
+    Understanding Sparse JL for Feature Hashing. 
+    Neural Information Processing Systems (NeurIPS) 2019.
     """
 
     def __init__(self, model, loader, imgsize, device, M, T, freq_print):
@@ -43,6 +54,22 @@ class SketchedKernels(ABC):
 
     def cwt_sketching(self, feats, layer_id):
 
+        r"""
+        Compute CWT for a batch of feature vectors
+
+        Parameters
+        ---------
+        feats : (batchsize, n_channels, height, width) PyTorch Tensor
+            A batch of feature vectors 
+        layer_id : int
+            The index of the layer from which the feature vectors are produced
+
+        Returns
+        --------
+        None
+
+        """
+
         batchsize  = feats.size(0)
         feats = feats.data.view(batchsize, -1).type(torch.FloatTensor)
         batchsize, dim = feats.size()
@@ -64,6 +91,17 @@ class SketchedKernels(ABC):
     def forward_with_layerwise_hooks(self, input_features):
 
         r"""
+        Forward function of a ResNet model
+
+        Parameters
+        ---------
+        input_features : (batchsize, 3, height, width) PyTorch Tensor
+            A batch of input images
+
+        Returns
+        --------
+        None
+
         """
         batchsize = input_features.size(0)
 
@@ -93,10 +131,19 @@ class SketchedKernels(ABC):
     def compute_sketched_mat(self):
 
         r"""
+        Forward data samples in a dataset to a pretrained neural network
+
+        Parameters
+        ---------
+        None
+
+        Returns
+        --------
+        None
+
         """
 
         self.model.eval()
-        total = 0
 
         with torch.no_grad():
             # Iterate through the data loader in batches:
@@ -116,6 +163,7 @@ class SketchedKernels(ABC):
     def compute_sketched_kernels(self):
 
         r"""
+        The main function to compute both the subsampled dataset and the projection matrix for the Nyström method
         """
 
         self.compute_sketched_mat()
@@ -125,6 +173,7 @@ class SketchedKernels(ABC):
                 self.projection_matrices[layer_id] = None
             else:
 
+                # Nyström
                 mat = self.sketched_matrices[layer_id].type(torch.cuda.FloatTensor)
                 temp = mat @ mat.T
                 temp = np.float32(temp.cpu().numpy())
