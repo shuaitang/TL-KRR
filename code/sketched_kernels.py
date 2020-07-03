@@ -90,37 +90,6 @@ class SketchedKernels(ABC):
         self.cwt_sketching(out, layer_id)
 
 
-
-    def cwt_matrix(self, n_rows, n_cols, T):
-
-        r"""
-        """
-
-        all_rows = []
-        all_cols = []
-        all_signs = []
-
-        for t in range(T):
-
-            chunk = int(n_rows / T)
-            shift = int(t * chunk)
-
-            rows = torch.randint(shift, shift+chunk, (1, n_cols))
-            cols = torch.arange(n_cols).view(1,-1)
-            signs = torch.randn(n_cols).sign().float()
-
-            all_rows.append(rows)
-            all_cols.append(cols)
-            all_signs.append(signs)
-
-        rows = torch.cat(all_rows, dim=1)
-        cols = torch.cat(all_cols, dim=1)
-        pos = torch.cat([rows.long(), cols.long()], dim=0)
-        signs = torch.cat(all_signs, dim=0)
-        cwt = torch.sparse.FloatTensor(pos, signs, torch.Size([n_rows, n_cols])).div( T ** 0.5 )
-        return cwt
-
-
     def compute_sketched_mat(self):
 
         r"""
