@@ -22,8 +22,6 @@ The Implementation relies on the following files:
 
 *learning_kernel_alignment.py* computes the optimal convex combination of feature vectors from individual layers that gives the highest alignment score with the target in a downstream task.
 
-*ridge_regression.py* implements a Ridge Regression method as a sklearn estimator, which can be plugged into other Cross-Validation methods in sklearn to optimise hyperparameters.
-
 *utils.py* has helper functions.
 
 *cub200.py* and *kuzushiji49.py* implement the PyTorch vision dataset class for CUB200 and Kuzushiji49, respectively.

@@ -11,9 +11,10 @@ import numpy as np
 
 from sketched_kernels import SketchedKernels
 from lowrank_feats import LowrankFeats
-from learning_kernel_alignment import LearningKernelAlignment
-from sklearn.linear_model import Ridge, RidgeClassifier
+from learning_kernel_alignment import LearningKernelAlignment    
 from utils import *
+
+from sklearn.linear_model import RidgeClassifier
 from sklearn.kernel_approximation import Nystroem
 from sklearn.model_selection import GridSearchCV
 
