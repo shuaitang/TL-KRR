@@ -12,7 +12,7 @@ import numpy as np
 from sketched_kernels import SketchedKernels
 from lowrank_feats import LowrankFeats
 from learning_kernel_alignment import LearningKernelAlignment
-from ridge_regression import RidgeRegression
+from sklearn.linear_model import Ridge, RidgeClassifier
 from utils import *
 from sklearn.kernel_approximation import Nystroem
 from sklearn.model_selection import GridSearchCV
@@ -105,7 +105,6 @@ if __name__ == "__main__":
         lowrank_feats["train"][layer_id] /= factor
         lowrank_feats["test"][layer_id] /= factor
 
-
     # # # # # # # # # # # # # # # #
     # Learning kernel alignment for finding a convex combination
     # # # # # # # # # # # # # # # #
@@ -149,21 +148,19 @@ if __name__ == "__main__":
     train_features = approx.transform(train_features)
     test_features  = approx.transform(test_features)
 
-
     # # # # # # # # # # # # # # # #
     # Ridge regression with cross validation
     # # # # # # # # # # # # # # # #
 
-    style = 'c' if dim < train_features.shape[0] else 'k'
-    clf = GridSearchCV(RidgeRegression(),
+    scale = np.linalg.norm(train_features) ** 2. / train_features.shape[1]
+    clf = GridSearchCV(RidgeClassifier(),
                             {
-                                'alpha':[10**i for i in range(-7, 0)],
-                                'style':[style],
+                                'alpha':[(10**i) * scale for i in range(-7, 0)],
                             },
-                        n_jobs=4)
+                        n_jobs=4)    
 
-    clf.fit(train_features, train_onehot)
-    test_pred_ = clf.predict(test_features)
-    # print(test_pred_)
-    acc = sum(np.argmax(test_pred_, axis=-1) == targets["test"])  * 1.0 / len(targets["test"])
+    clf.fit(train_features, train_targets)    
+    y_pred_ = clf.predict(test_features)
+    acc = sum(y_pred_ == targets["test"])  * 1.0 / len(targets["test"])
+    
     print(acc)

@@ -77,7 +77,7 @@ class LearningKernelAlignment(ABC):
         if init_mu == None:
             init_mu = np.ones_like(a)
 
-        f = lambda v: v.reshape(1, -1) @ M @ v.reshape(-1, 1) - 2 * v.reshape(1, -1) @ a
+        f = lambda v: (v.reshape(1, -1) @ M @ v.reshape(-1, 1) - 2 * v.reshape(1, -1) @ a).reshape(-1)
         bnds = tuple([(0, None) for i in range(len(a))])
         res = minimize(f, init_mu, bounds=bnds)
 
