@@ -102,7 +102,7 @@ if __name__ == "__main__":
         lowrank_feats["test"][layer_id]  -= mean_vec
         
         # Normalisation
-        factor = np.linalg.norm(lowrank_feats["train"][layer_id].T @ lowrank_feats["train"][layer_id])
+        factor = np.linalg.norm(lowrank_feats["train"][layer_id].T @ lowrank_feats["train"][layer_id]) ** 0.5
         lowrank_feats["train"][layer_id] /= factor
         lowrank_feats["test"][layer_id] /= factor
 
