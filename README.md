@@ -16,7 +16,7 @@ The Implementation relies on the following files:
 
 *TLKRR.py* is the main file that conducts our four-step transfer learning method with kernel ridge regression.
 
-*sketched_kernels.py* sketches the feature vectors at individual layers into a fixed number of buckets.
+*sketched_kernels.py* sketches the feature vectors at individual layers into a fixed number of buckets. It now supports feature hashing as the first step to reduce the dimensionality of feature vectors so that one could deploy deeper models.
 
 *lowrank_feats.py* applies the Nyström method on top of feature vectors to compute low-rank approximations.
 
@@ -39,8 +39,23 @@ pandas
 
 ## Simple Example
 ```
-CUDA_VISIBLE_DEVICES=0 python3 -u TLKRR.py --datapath data/ --modelname resnet18 --task cifar100 
+CUDA_VISIBLE_DEVICES=0 python3 -u TLKRR.py \
+    --datapath data/ \
+    --modelname resnet18 \
+    --task cifar100 \
+    --bsize 800
 ```
+
+To reduce the memory consumption, one could do the following:
+```
+CUDA_VISIBLE_DEVICES=0 python3 -u TLKRR.py \
+    --datapath data/ \
+    --modelname wide_resnet50_2 \
+    --task cifar100 \
+    --bsize 400 \
+    --feature_hashing --factor 4
+```
+One could set *factor* or/and *M* to a large number to get decent performance.
 
 ## Authors  
 Shuai Tang
@@ -48,3 +63,8 @@ Shuai Tang
 ## Acknowledgements
 We gratefully thank [Charlie Dickens](https://c-dickens.github.io/) and [Wesley J. Maddox](https://wjmaddox.github.io/) for fruitful discussions, and appreciate [Richard Gao](http://www.rdgao.com/), [Mengting Wan](https://mengtingwan.github.io/) and [Shi Feng](http://users.umiacs.umd.edu/~shifeng/) for comments on the draft. 
 Huge amount of thanks to my advisor --- [Virginia de Sa](http://www.cogsci.ucsd.edu/~desa/) --- for basically allowing me to do whatever I am interested in. :)  
+
+## Rant
+If the number of data samples is extremely small, then one should skip the first step of approximating low-rank features, otherwise the *undersampling* issue would occur and hurt the performance.
+
+For memory concern, one could set the precision of generated feature vectors to half-precision floating-point, and it gives a minor performance drop.

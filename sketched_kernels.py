@@ -8,15 +8,7 @@ import numpy as np
 from abc import ABC
 import scipy, scipy.linalg
 
-@torch.jit.script
-def hashing(SA, row_maps, sign, data, T):
-    # type: (torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, int) -> torch.Tensor
-    num_hashes = row_maps.size(0)
-
-    for i in range(num_hashes):
-        SA[row_maps[i]] += data[int(i / T)] * sign[i]
-    return SA
-
+from utils import *
 
 class SketchedKernels(ABC):
 
@@ -34,22 +26,29 @@ class SketchedKernels(ABC):
     Neural Information Processing Systems (NeurIPS) 2019.
     """
 
-    def __init__(self, model, loader, imgsize, device, M, T, freq_print):
+    def __init__(self, model, loader, args):
 
         r"""
         Initialise variables
         """
         self.model = model
         self.loader = loader
-        self.imgsize = imgsize
-        self.device = device
-        self.M = M
-        self.T = T
-        self.freq_print = freq_print
+
+        self.imgsize = args.imgsize
+        self.device = args.device
+        self.M = args.M
+        self.T = args.T
+        self.factor = args.factor
+        self.feature_hashing = args.feature_hashing
+        self.freq_print = args.freq_print
+
+        self.max_feats = self.M * self.factor
+        self.hashing_matrices = {}
 
         self.n_samples = 0
         self.sketched_matrices = {}
         self.projection_matrices = {}
+        self.mean_vectors = {}
 
 
     def cwt_sketching(self, feats, layer_id):
@@ -71,18 +70,27 @@ class SketchedKernels(ABC):
         """
 
         batchsize  = feats.size(0)
-        feats = feats.data.view(batchsize, -1).type(torch.FloatTensor)
+        feats = feats.data.view(batchsize, -1)
         batchsize, dim = feats.size()
 
-        if dim <= self.M:
-            self.sketched_matrices[layer_id] = None
+        if dim > self.max_feats and self.feature_hashing:
+            if layer_id not in self.hashing_matrices:
+                self.hashing_matrices[layer_id] = sjlt_mat(self.max_feats, dim, self.T).to(self.device)
+            feats = torch.sparse.mm(self.hashing_matrices[layer_id], feats.T).T
+            dim = self.max_feats 
         else:
+            self.hashing_matrices[layer_id] = None
+
+        if dim > self.M:
             if layer_id not in self.sketched_matrices:
                 self.sketched_matrices[layer_id] = torch.zeros(self.M, dim).float()
-
-            _row_map = torch.from_numpy(np.random.choice(self.M, batchsize * self.T, replace=True)).long()
-            _sign = torch.randn(batchsize * self.T).sign()
-            self.sketched_matrices[layer_id] = hashing(self.sketched_matrices[layer_id], _row_map, _sign, feats, self.T)
+            self.sketched_matrices[layer_id] += torch.sparse.mm(self.sjlt, feats).type(torch.FloatTensor)
+        else:
+            self.sketched_matrices[layer_id] = None
+        
+        if layer_id not in self.mean_vectors:
+            self.mean_vectors[layer_id] = 0.
+        self.mean_vectors[layer_id] += feats.sum(axis=0)
 
         del feats
         torch.cuda.empty_cache()
@@ -151,10 +159,13 @@ class SketchedKernels(ABC):
 
                 # load a batch of data samples
                 data, target = data.to(self.device), target.to(self.device)
-                self.forward_with_layerwise_hooks(data)
 
                 batchsize = data.size(dim=0)
                 self.n_samples += batchsize
+
+                # sample a random projection matrix
+                self.sjlt = sjlt_mat(self.M, batchsize, self.T).to(self.device)
+                self.forward_with_layerwise_hooks(data)
 
                 if batch_idx % self.freq_print == 0:
                     print("finished {:d}/{:d}".format(batch_idx, len(self.loader)))
@@ -168,13 +179,18 @@ class SketchedKernels(ABC):
 
         self.compute_sketched_mat()
 
-        for layer_id in range(len(self.sketched_matrices)):
+        for layer_id in self.sketched_matrices:
+            self.mean_vectors[layer_id] /= self.n_samples
+
             if self.sketched_matrices[layer_id] == None:
                 self.projection_matrices[layer_id] = None
             else:
 
                 # Nyström
                 mat = self.sketched_matrices[layer_id].type(torch.cuda.FloatTensor)
+                mat -= self.mean_vectors[layer_id].type(torch.cuda.FloatTensor)
+                self.sketched_matrices[layer_id] = mat.type(torch.FloatTensor)
+
                 temp = mat @ mat.T
                 temp = np.float32(temp.cpu().numpy())
 

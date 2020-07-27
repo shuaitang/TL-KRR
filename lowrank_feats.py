@@ -14,7 +14,7 @@ class LowrankFeats(ABC):
     the module computes a low-rank approximation of feature vectors from that layer.
     """
 
-    def __init__(self, model, loader, projection_matrices, sketched_matrices, imgsize, device, freq_print):
+    def __init__(self, model, loader, projection_matrices, mean_vectors, sketched_matrices, hashing_matrices, args):
 
         r"""
         Initialise variables
@@ -29,12 +29,15 @@ class LowrankFeats(ABC):
         loader : PyTorch DataLoader instance
             A data loader for the dataset of a downstream task
 
-        projection_matrices : (n_layers) list
-            A list of projection matrices obtained through the Nyström method for dimensionality reduction.
+        projection_matrices : (n_layers) dict
+            A dictionary of projection matrices obtained through the Nyström method for dimensionality reduction.
             The number of elements is equal to the number of layers one wants to accumulate.
 
-        sketched_matrices : (n_layers) list
-            A list of data summaries obtained through CWT (Clarkson-Woodruff Transformation), 
+        mean_vectors : (n_layers) dict
+            A dictionary of mean vectors for each layer.
+
+        sketched_matrices : (n_layers) dict
+            A dictionary of data summaries obtained through CWT (Clarkson-Woodruff Transformation), 
             of which each serves as subsampled data points for Nyström.
         
         imgsize : int
@@ -52,11 +55,13 @@ class LowrankFeats(ABC):
         self.model = model
         self.loader = loader
         self.projection_matrices = projection_matrices
+        self.mean_vectors = mean_vectors
         self.sketched_matrices = sketched_matrices
+        self.hashing_matrices = hashing_matrices
 
-        self.imgsize = imgsize
-        self.device = device
-        self.freq_print = freq_print
+        self.imgsize = args.imgsize
+        self.device = args.device
+        self.freq_print = args.freq_print
 
         self.lowrank_feats = {key: [] for key in self.projection_matrices}
         self.targets = []
@@ -85,10 +90,16 @@ class LowrankFeats(ABC):
         batchsize  = feats.size(0)
         feats = feats.data.view(batchsize, -1).type(torch.cuda.FloatTensor)
 
+        if self.hashing_matrices[layer_id] is not None:
+            feats = torch.sparse.mm(self.hashing_matrices[layer_id], feats.T).T
+
+        mean_vector = self.mean_vectors[layer_id].type(torch.cuda.FloatTensor)
+        feats -= mean_vector
+
         if self.projection_matrices[layer_id] is not None:
             sketched_feats = self.sketched_matrices[layer_id].type(torch.cuda.FloatTensor)
             projection_matrix = self.projection_matrices[layer_id].type(torch.cuda.FloatTensor)
-
+            
             temp = feats @ sketched_feats.T
             del sketched_feats
             temp = temp @ projection_matrix
@@ -97,6 +108,7 @@ class LowrankFeats(ABC):
 
             temp = temp.cpu().float()
         else:
+
             temp = feats.cpu().float()
 
         self.lowrank_feats[layer_id].append(temp)
