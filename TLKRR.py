@@ -24,9 +24,9 @@ if __name__ == "__main__":
     # Get arguments from the command line
     parser = argparse.ArgumentParser(description='PyTorch CWT sketching kernel matrices')
 
-    parser.add_argument('--datapath', type=str,
+    parser.add_argument('--datapath', type=str, default='data/',
                                 help='absolute path to the dataset')
-    parser.add_argument('--modelname', type=str,
+    parser.add_argument('--modelname', type=str, default='resnet18',
                                 help='model name')
 
     parser.add_argument('--seed', default=0, type=int,
@@ -92,7 +92,7 @@ if __name__ == "__main__":
     # Project feature vectors of individual layers to low-dimensional spaces 
     # on both the training and test set
     for split in ["train", "test"]:
-        proj = LowrankFeats(net, loader[split], csm.projection_matrices, csm.mean_vectors, csm.sketched_matrices, csm.hashing_matrices, args)
+        proj = LowrankFeats(net, loader[split], csm.projection_matrices, csm.mean_vectors, csm.hashing_matrices, args)
         proj.compute_lowrank_feats()
         lowrank_feats[split] = proj.lowrank_feats
         targets[split] = proj.targets
