@@ -14,7 +14,7 @@ class LowrankFeats(ABC):
     the module computes a low-rank approximation of feature vectors from that layer.
     """
 
-    def __init__(self, model, loader, projection_matrices, mean_vectors, sketched_matrices, hashing_matrices, args):
+    def __init__(self, model, loader, projection_matrices, mean_vectors, hashing_matrices, args):
 
         r"""
         Initialise variables
@@ -35,10 +35,6 @@ class LowrankFeats(ABC):
 
         mean_vectors : (n_layers) dict
             A dictionary of mean vectors for each layer.
-
-        sketched_matrices : (n_layers) dict
-            A dictionary of data summaries obtained through CWT (Clarkson-Woodruff Transformation), 
-            of which each serves as subsampled data points for Nyström.
         
         imgsize : int
             The size of the input images
@@ -56,7 +52,6 @@ class LowrankFeats(ABC):
         self.loader = loader
         self.projection_matrices = projection_matrices
         self.mean_vectors = mean_vectors
-        self.sketched_matrices = sketched_matrices
         self.hashing_matrices = hashing_matrices
 
         self.imgsize = args.imgsize
@@ -97,21 +92,17 @@ class LowrankFeats(ABC):
         feats -= mean_vector
 
         if self.projection_matrices[layer_id] is not None:
-            sketched_feats = self.sketched_matrices[layer_id].type(torch.cuda.FloatTensor)
             projection_matrix = self.projection_matrices[layer_id].type(torch.cuda.FloatTensor)
-            
-            temp = feats @ sketched_feats.T
-            del sketched_feats
-            temp = temp @ projection_matrix
+            feats = feats @ projection_matrix
             del projection_matrix
             torch.cuda.empty_cache()
 
-            temp = temp.cpu().float()
+            feats = feats.cpu().float()
         else:
 
-            temp = feats.cpu().float()
+            feats = feats.cpu().float()
 
-        self.lowrank_feats[layer_id].append(temp)
+        self.lowrank_feats[layer_id].append(feats)
 
 
     def forward_with_layerwise_hooks(self, input_features):
@@ -208,5 +199,5 @@ class LowrankFeats(ABC):
             self.lowrank_feats[layer_id] = torch.cat(self.lowrank_feats[layer_id], dim=0).float().numpy()
 
         self.targets = torch.cat(self.targets, dim=0).numpy()
-        del self.projection_matrices, self.sketched_matrices
+        del self.projection_matrices
         torch.cuda.empty_cache()

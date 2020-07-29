@@ -90,7 +90,7 @@ class SketchedKernels(ABC):
         
         if layer_id not in self.mean_vectors:
             self.mean_vectors[layer_id] = 0.
-        self.mean_vectors[layer_id] += feats.sum(axis=0)
+        self.mean_vectors[layer_id] += feats.sum(axis=0).type(torch.FloatTensor)
 
         del feats
         torch.cuda.empty_cache()
@@ -189,7 +189,7 @@ class SketchedKernels(ABC):
                 # Nyström
                 mat = self.sketched_matrices[layer_id].type(torch.cuda.FloatTensor)
                 mat -= self.mean_vectors[layer_id].type(torch.cuda.FloatTensor)
-                self.sketched_matrices[layer_id] = mat.type(torch.FloatTensor)
+                # self.sketched_matrices[layer_id] = mat.type(torch.FloatTensor)
 
                 temp = mat @ mat.T
                 temp = np.float32(temp.cpu().numpy())
@@ -200,6 +200,9 @@ class SketchedKernels(ABC):
                 nnz = sum(eigvals != 0)
 
                 projection = eigvecs[:,:nnz] * eigvals[:nnz].reshape(1, -1)
-                self.projection_matrices[layer_id] = torch.from_numpy(projection)
+                projection = torch.from_numpy(projection).to(self.device)
 
-            torch.cuda.empty_cache()
+                self.projection_matrices[layer_id] = (mat.T @ projection).type(torch.FloatTensor)
+
+        del self.sketched_matrices
+        torch.cuda.empty_cache()
