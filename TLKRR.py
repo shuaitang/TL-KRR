@@ -1,5 +1,5 @@
 import os
-os.environ["OMP_NUM_THREADS"] = "4"
+os.environ["OMP_NUM_THREADS"] = "10"
 
 import torch
 import torch.nn as nn
@@ -15,7 +15,7 @@ from learning_kernel_alignment import LearningKernelAlignment
 from ridge_regression import RidgeRegression 
 from utils import *
 
-from sklearn.linear_model import RidgeClassifier
+from sklearn.model_selection import train_test_split
 from sklearn.kernel_approximation import Nystroem
 from sklearn.model_selection import GridSearchCV
 
@@ -37,6 +37,9 @@ if __name__ == "__main__":
 
     parser.add_argument('--bsize', default=800, type=int,
                                 help='batch size for computing the kernel')
+
+    parser.add_argument('--learning_rate', default=0.01, type=float,
+                                help='learning rate for competitive learning')
 
     parser.add_argument('--M', '--num-buckets-sketching', default=2048, type=int,
                                 help='number of buckets in Sketching')
@@ -146,7 +149,7 @@ if __name__ == "__main__":
     mean = train_features.mean(axis=0, keepdims=True)
     train_features -= mean
     test_features  -= mean
-
+    
     # # # # # # # # # # # # # # # #
     # Nyström again!
     # # # # # # # # # # # # # # # #

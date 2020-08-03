@@ -10,7 +10,7 @@ import scipy, scipy.linalg
 
 from utils import *
 
-class SketchedKernels(ABC):
+class FrequentDirections(ABC):
 
     r"""
     For each layer, Clarkson-Woodruff Transformation (CWT) is applied to hash feature vectors to a small number of buckets,
@@ -24,10 +24,6 @@ class SketchedKernels(ABC):
     Jagadeesan, M. (2019). 
     Understanding Sparse JL for Feature Hashing. 
     Neural Information Processing Systems (NeurIPS) 2019.
-
-    Rumelhart, D.E., & Zipser, D. (1985). 
-    Feature discovery by competitive learning.
-
     """
 
     def __init__(self, model, loader, args):
@@ -45,15 +41,15 @@ class SketchedKernels(ABC):
         self.factor = args.factor
         self.feature_hashing = args.feature_hashing
         self.freq_print = args.freq_print
-        self.learning_rate = args.learning_rate
 
         self.max_feats = self.M * self.factor
         self.hashing_matrices = {}
 
         self.n_samples = 0
-        self.sketched_matrices = {}
+        # self.projected_matrices = {}
         self.projection_matrices = {}
-        self.mean_vectors = {}
+        # self.mean_vectors = {}
+
 
     def cwt_sketching(self, feats, layer_id):
 
@@ -86,36 +82,30 @@ class SketchedKernels(ABC):
             self.hashing_matrices[layer_id] = None
 
         if dim > self.M:
-            if layer_id not in self.sketched_matrices:
-                self.sketched_matrices[layer_id] = []
+            # if layer_id not in self.sketched_matrices:
+                # self.sketched_matrices[layer_id] = torch.zeros(self.M, dim).float()
+            # self.sketched_matrices[layer_id] += torch.sparse.mm(self.sjlt, feats).type(torch.FloatTensor)
+            if layer_id not in self.projection_matrices:
+                self.projection_matrices[layer_id] = {
+                    "s": torch.zeros(dim, self.M),
+                    "q": torch.qr(torch.randn(dim, self.M))[0],
+                }
+            q = self.projection_matrices[layer_id]["q"].to(self.device)
+            s = self.projection_matrices[layer_id]["s"].to(self.device)
 
-            if type(self.sketched_matrices[layer_id]) == list:
-                # initialise centroids with first few batches of feature vectors
-                self.sketched_matrices[layer_id].append(feats.type(torch.FloatTensor))    
-                temp = torch.cat(self.sketched_matrices[layer_id], dim=0)
-                if temp.size(0) > self.M:
-                    self.sketched_matrices[layer_id] = temp[:self.M]
-                    feats = temp[self.M:].to(self.device)
-                else:
-                    self.sketched_matrices[layer_id] = [temp]
-            else:
-                # Competitive learning
-                centroids = self.sketched_matrices[layer_id].to(self.device)
-                dotprod = feats @ centroids.T
-                l2dis = feats.norm(dim=-1, keepdim=True).view(-1, 1) ** 2. + \
-                    centroids.norm(dim=-1, keepdim=True).view(1, -1) ** 2. - 2 * dotprod
-                neighbours = torch.argmin(l2dis, dim=1)
-                # Technically, the learning rate should decay to stablise centroids,
-                # but ... I just keep it as a constant
-                centroids[neighbours] += self.learning_rate * (feats - centroids[neighbours])
-                self.sketched_matrices[layer_id] = centroids.type(torch.FloatTensor)
+            temp = feats.T @ (feats @ q) / batchsize
+            s += temp
+            q, r = torch.qr(s)
 
+            self.projection_matrices[layer_id]["s"] = s.cpu()
+            self.projection_matrices[layer_id]["q"] = q.cpu()
         else:
-            self.sketched_matrices[layer_id] = None
+            # self.sketched_matrices[layer_id] = None
+            self.projection_matrices[layer_id] = None
         
-        if layer_id not in self.mean_vectors:
-            self.mean_vectors[layer_id] = 0.
-        self.mean_vectors[layer_id] += feats.sum(axis=0).type(torch.FloatTensor)
+        # if layer_id not in self.mean_vectors:
+            # self.mean_vectors[layer_id] = 0.
+        # self.mean_vectors[layer_id] += feats.sum(axis=0)
 
         del feats
         torch.cuda.empty_cache()
@@ -204,29 +194,25 @@ class SketchedKernels(ABC):
 
         self.compute_sketched_mat()
 
-        for layer_id in self.sketched_matrices:
-            self.mean_vectors[layer_id] /= self.n_samples
+        for layer_id in self.projection_matrices:
+            # self.mean_vectors[layer_id] /= self.n_samples
 
-            if self.sketched_matrices[layer_id] == None:
-                self.projection_matrices[layer_id] = None
-            else:
+            if self.projection_matrices[layer_id] is not None:
+                self.projection_matrices[layer_id] = self.projection_matrices[layer_id]["q"]
+                # # Nyström
+                # mat = self.sketched_matrices[layer_id].type(torch.cuda.FloatTensor)
+                # mat -= self.mean_vectors[layer_id].type(torch.cuda.FloatTensor)
+                # self.sketched_matrices[layer_id] = mat.type(torch.FloatTensor)
 
-                # Nyström
-                mat = self.sketched_matrices[layer_id].type(torch.cuda.FloatTensor)
-                mat -= self.mean_vectors[layer_id].type(torch.cuda.FloatTensor)
+                # temp = mat @ mat.T
+                # temp = np.float32(temp.cpu().numpy())
 
-                temp = mat @ mat.T
-                temp = np.float32(temp.cpu().numpy())
+                # pinv = scipy.linalg.pinvh(temp)
+                # w, v = scipy.linalg.eigh(pinv)
+                # eigvecs, eigvals = np.float32(v[:,::-1]), np.float32(w[::-1].clip(0.) ** 0.5)
+                # nnz = sum(eigvals != 0)
 
-                pinv = scipy.linalg.pinvh(temp)
-                w, v = scipy.linalg.eigh(pinv)
-                eigvecs, eigvals = np.float32(v[:,::-1]), np.float32(w[::-1].clip(0.) ** 0.5)
-                nnz = sum(eigvals != 0)
+                # projection = eigvecs[:,:nnz] * eigvals[:nnz].reshape(1, -1)
+                # self.projection_matrices[layer_id] = torch.from_numpy(projection)
 
-                projection = eigvecs[:,:nnz] * eigvals[:nnz].reshape(1, -1)
-                projection = torch.from_numpy(projection).to(self.device)
-
-                self.projection_matrices[layer_id] = (mat.T @ projection).type(torch.FloatTensor)
-
-        del self.sketched_matrices
-        torch.cuda.empty_cache()
+            torch.cuda.empty_cache()

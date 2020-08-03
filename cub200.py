@@ -47,8 +47,6 @@ class CUB200(VisionDataset):
         else:
             self.data = self.data[self.data.is_training_img == 0]
 
-        # print(self.data)
-
     def _check_integrity(self):
         try:
             self._load_metadata()
@@ -85,5 +83,5 @@ class CUB200(VisionDataset):
 
         if self.transform is not None:
             img = self.transform(img)
-        # print(img.max())
+
         return img, target
