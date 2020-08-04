@@ -1,4 +1,5 @@
 *.sh
 data/
 logs/
+_logs/
 __pycache__/

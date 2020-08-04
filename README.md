@@ -60,7 +60,31 @@ One could set *factor* or/and *M* to a large number to get decent performance.
 The learning rate of the competitive learning algorithm for finding a subset of samples can be tuned to get good performance as well. The default value is a *personal random guess*, and it already works. Competitive learning seems to work better with smaller batch size, but the default one is good enough so it is remained the same. 
 
 ## Results
-Coming soon :yum:
+Hyperparameter settings:
+```json
+{
+    "seed": 0,
+    "bsize": 800,
+    "M": 2048,
+    "T": 4,
+    "feature_hashing": true,
+    "factor": 4,
+    "learning_rate": 0.01,
+    "bsize": 200
+}
+```
+
+| Models/Tasks   | CIFAR10 | CIFAR100 | STL10 |  SVHN | KUZUSHIJI49 |
+|----------------|:-------:|:--------:|:-----:|:-----:|:-----------:|
+| ResNet18       |  91.11  |   70.53  | 96.28 | 89.62 |    92.18    |
+| ResNet34       |  92.51  |   73.70  | 97.34 | 87.26 |             |
+| ResNet50       |  92.02  |   74.68  | 97.75 | 90.12 |             |
+| ResNet101      |  92.88  |   75.42  | 98.34 | 91.78 |             |
+| ResNet152      |  93.85  |   77.06  | 98.63 | 90.93 |             |
+| ResNeXt50      |  92.61  |   73.89  | 98.03 | 90.15 |             |
+| ResNeXt101     |  94.12  |   76.70  | 98.51 | 89.58 |             |
+| Wide-ResNet50  |  92.29  |   74.23  | 98.30 | 91.68 |             |
+| Wide-ResNet101 |  93.90  |   76.06  | 98.41 | 92.32 |             |
 
 ## Authors  
 Shuai Tang
