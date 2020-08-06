@@ -20,6 +20,19 @@ class DatasetsNames(Enum):
     stl10    = lambda x: {"split" : x}
 
 
+@torch.jit.script
+def competitive_learning(SA, feats, lr):
+    # type: (torch.Tensor, torch.Tensor, float) -> torch.Tensor
+    bsize = feats.size(0)
+
+    for i in range(bsize):
+        neighbour = torch.argmin((feats[i:i+1] - SA).norm(dim=1, p=2.), dim=0)
+        SA[neighbour] += lr * (feats[i] - SA[neighbour])
+
+    return SA
+
+
+
 def pca(data_mat, proj_mat=None, portion=0.99):
 
     r"""
@@ -88,6 +101,7 @@ def sjlt_mat(k, d, T):
     sjlt = torch.sparse.FloatTensor(indices, signs, torch.Size([d, k])).transpose(1,0).div_(T ** 0.5)
     
     return sjlt
+
 
 
 def load_model(device, modelname, pretrained=True):

@@ -2,4 +2,5 @@
 data/
 logs/
 _logs/
+__logs/
 __pycache__/

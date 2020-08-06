@@ -38,7 +38,10 @@ if __name__ == "__main__":
     parser.add_argument('--bsize', default=800, type=int,
                                 help='batch size for computing the kernel')
 
-    parser.add_argument('--learning_rate', default=0.01, type=float,
+    parser.add_argument('--subsampling', default='competitive_learning', type=str,
+                                help='subsampling method for Nyström')
+
+    parser.add_argument('--learning_rate', default=0.05, type=float,
                                 help='learning rate for competitive learning')
 
     parser.add_argument('--M', '--num-buckets-sketching', default=2048, type=int,

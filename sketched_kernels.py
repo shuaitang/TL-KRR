@@ -46,6 +46,7 @@ class SketchedKernels(ABC):
         self.feature_hashing = args.feature_hashing
         self.freq_print = args.freq_print
         self.learning_rate = args.learning_rate
+        self.subsampling = args.subsampling
 
         self.max_feats = self.M * self.factor
         self.hashing_matrices = {}
@@ -86,29 +87,27 @@ class SketchedKernels(ABC):
             self.hashing_matrices[layer_id] = None
 
         if dim > self.M:
-            if layer_id not in self.sketched_matrices:
-                self.sketched_matrices[layer_id] = []
+            if self.subsampling == "competitive_learning":
+                if layer_id not in self.sketched_matrices:
+                    self.sketched_matrices[layer_id] = []
 
-            if type(self.sketched_matrices[layer_id]) == list:
-                # initialise centroids with first few batches of feature vectors
-                self.sketched_matrices[layer_id].append(feats.type(torch.FloatTensor))    
-                temp = torch.cat(self.sketched_matrices[layer_id], dim=0)
-                if temp.size(0) > self.M:
-                    self.sketched_matrices[layer_id] = temp[:self.M]
-                    feats = temp[self.M:].to(self.device)
+                if type(self.sketched_matrices[layer_id]) == list:
+                    # initialise centroids with first few batches of feature vectors
+                    self.sketched_matrices[layer_id].append(feats.type(torch.FloatTensor))    
+                    temp = torch.cat(self.sketched_matrices[layer_id], dim=0)
+                    if temp.size(0) > self.M:
+                        self.sketched_matrices[layer_id] = temp[:self.M]
+                        feats = temp[self.M:].to(self.device)
+                    else:
+                        self.sketched_matrices[layer_id] = [temp]
                 else:
-                    self.sketched_matrices[layer_id] = [temp]
-            else:
-                # Competitive learning
-                centroids = self.sketched_matrices[layer_id].to(self.device)
-                dotprod = feats @ centroids.T
-                l2dis = feats.norm(dim=-1, keepdim=True).view(-1, 1) ** 2. + \
-                    centroids.norm(dim=-1, keepdim=True).view(1, -1) ** 2. - 2 * dotprod
-                neighbours = torch.argmin(l2dis, dim=1)
-                # Technically, the learning rate should decay to stablise centroids,
-                # but ... I just keep it as a constant
-                centroids[neighbours] += self.learning_rate * (feats - centroids[neighbours])
-                self.sketched_matrices[layer_id] = centroids.type(torch.FloatTensor)
+                    # Competitive learning
+                    self.sketched_matrices[layer_id] = competitive_learning(self.sketched_matrices[layer_id].to(self.device), feats, self.learning_rate).type(torch.FloatTensor)
+
+            if self.subsampling == "sjlt":
+                if layer_id not in self.sketched_matrices:
+                    self.sketched_matrices[layer_id] = torch.zeros(self.M, dim).float()
+                self.sketched_matrices[layer_id] += torch.sparse.mm(self.sjlt, feats).type(torch.FloatTensor)               
 
         else:
             self.sketched_matrices[layer_id] = None
