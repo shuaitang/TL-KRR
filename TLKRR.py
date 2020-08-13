@@ -38,7 +38,7 @@ if __name__ == "__main__":
     parser.add_argument('--bsize', default=800, type=int,
                                 help='batch size for computing the kernel')
 
-    parser.add_argument('--subsampling', default='competitive_learning', type=str,
+    parser.add_argument('--subsampling', default='sjlt', type=str,
                                 help='subsampling method for Nyström')
 
     parser.add_argument('--learning_rate', default=0.05, type=float,
@@ -66,6 +66,7 @@ if __name__ == "__main__":
     if args.device == 'cuda':
         cudnn.benchmark = True
         torch.cuda.manual_seed(args.seed)
+    np.random.seed(args.seed)
 
     # The size of images for training and testing ImageNet models
     args.imgsize = 224
@@ -145,7 +146,7 @@ if __name__ == "__main__":
     test_features  = np.concatenate(test_features,  axis=1)
 
     # PCA for dimensionality reduction
-
+    print("Running PCA to reduce the dimensionality")
     train_features, proj_mat = pca(train_features, None)
     test_features,  _        = pca(test_features,  proj_mat)
 
@@ -153,10 +154,12 @@ if __name__ == "__main__":
     train_features -= mean
     test_features  -= mean
     
+    del lka, lowrank_feats
+
     # # # # # # # # # # # # # # # #
     # Nyström again!
     # # # # # # # # # # # # # # # #
-
+    print("Running Nystroem Approximation")
     factor = np.max(np.linalg.norm(train_features, axis=1))
     train_features /= factor
     test_features /= factor
@@ -168,7 +171,7 @@ if __name__ == "__main__":
     approx.fit(train_features)
     train_features = approx.transform(train_features)
     test_features  = approx.transform(test_features)
-
+    
     # # # # # # # # # # # # # # # #
     # Ridge regression with cross validation
     # # # # # # # # # # # # # # # #

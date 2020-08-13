@@ -9,6 +9,7 @@ import torchvision.models as models
 from enum import Enum
 import numpy as np
 import scipy.linalg
+from scipy._lib._util import check_random_state, rng_integers
 
 class DatasetsNames(Enum):
     cifar10     = lambda x: {"train" : True if x == "train" else False}
@@ -33,7 +34,7 @@ def competitive_learning(SA, feats, lr):
 
 
 
-def pca(data_mat, proj_mat=None, portion=0.99):
+def pca(data_mat, proj_mat=None, portion=0.995):
 
     r"""
     Principal Component Analysis through Singular Value Decomposition
@@ -69,7 +70,7 @@ def pca(data_mat, proj_mat=None, portion=0.99):
     return data_mat, proj_mat
 
 
-def sjlt_mat(k, d, T):
+def sjlt_mat(k, d, T, seed=None):
 
     r"""
     Sparse Johnson-Lindenstrauss Transformation via a stack of CountSketch methods
@@ -85,16 +86,20 @@ def sjlt_mat(k, d, T):
     T : int
         Number of hash tables to deploy
 
+    seed : int
+        random seed
+
     Return 
     ------
     sjlt : (k, d) PyTorch Sparse Tensor
 
     """
 
-    cols = np.random.choice(k, d * T, replace=True)
+    rng = check_random_state(seed)
+    cols = rng.choice(k, d * T, replace=True)
     rows = np.vstack([np.arange(d) for t in range(T)]).transpose().reshape(-1)
     cols, rows = list(cols), list(rows)
-    signs = list((np.random.randn(T * d) > 0.) * 2. - 1.)
+    signs = list((rng.randn(T * d) > 0.) * 2. - 1.)
     indices = torch.LongTensor([rows, cols])
     signs = torch.FloatTensor(signs)
 
